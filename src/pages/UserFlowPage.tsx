@@ -8,7 +8,7 @@ export function UserFlowPage() {
     <div>
       <PageHeader
         title="User Flow"
-        subtitle="Simplified user/request journey through the SentinelMesh protection lifecycle"
+        subtitle="Simplified user/request journey through the LakshmanRekha protection lifecycle"
         icon={<GitBranch className="h-5 w-5" />}
       />
       <div className="space-y-5">
