@@ -202,7 +202,14 @@ describe('sampleRecords', () => {
   it('returns mostly attack records in ddos mode', () => {
     const out = sampleRecords(bundle, 'ddos', 100, () => 0.5);
     const attacks = out.filter((r) => r.label === 'attack').length;
-    expect(attacks / out.length).toBeCloseTo(BLEND.ddos, 1);
+    expect(attacks / out.length).toBeGreaterThan(0.5);
+  });
+
+  it('orders the blend table from calm to hostile', () => {
+    expect(BLEND.normal).toBe(0);
+    expect(BLEND.restored).toBe(0);
+    expect(BLEND.spike).toBeLessThan(BLEND.httpflood);
+    expect(BLEND.httpflood).toBeLessThan(BLEND.ddos);
   });
 
   it('falls back to the available label when one side is empty', () => {
@@ -270,9 +277,9 @@ export function sampleRecords(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS, 4 tests.
+Expected: PASS, 5 tests.
 
-Note: with `rng: () => 0.5`, `0.5 < 0.9` is true for ddos so every draw is an attack; the `toBeCloseTo(0.9, 1)` assertion tolerates this. With `normal` (share 0) `0.5 < 0` is false, giving all benign.
+Note on the fixed `rng`: with `() => 0.5`, `0.5 < 0.9` is always true for ddos so every draw is an attack (ratio 1.0, satisfying `> 0.5`); for `normal` (share 0) `0.5 < 0` is always false, giving all benign. Do not assert an exact ratio against `BLEND[mode]` here — a constant rng cannot reproduce the blend proportion.
 
 - [ ] **Step 5: Commit**
 
@@ -392,7 +399,7 @@ export function deriveProfile(records: ReplayRecord[], fallback: Profile): Profi
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS, 9 tests total.
+Expected: PASS, 10 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -513,20 +520,20 @@ export function recordsToFeatures(
   const topService = records[0].service;
   const sameService = records.filter((r) => r.service === topService).length / records.length;
 
+  // Service concentration drives two different cards; compute once.
+  const concentration = () => {
+    const v = Math.round(sameService * 100);
+    return { value: v, display: `${v}%`, anomaly: v > 60, delta: (v > 60 ? 'up' : null) as 'up' | null };
+  };
+
   const map: Record<string, () => Partial<TelemetryFeature>> = {
     rps: () => ({ value: profile.totalRps, display: profile.totalRps.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
     reqPerIp: () => ({ value: avgCount, display: avgCount.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
     uniqueIps: () => ({ value: uniqueHosts, display: uniqueHosts.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
-    ipConc: () => {
-      const v = Math.round(sameService * 100);
-      return { value: v, display: `${v}%`, anomaly: v > 60, delta: v > 60 ? 'up' : null };
-    },
+    ipConc: concentration,
     reqCountry: () => ({ value: protos, display: String(protos), anomaly, delta: null }),
     reqAsn: () => ({ value: protos, display: String(protos), anomaly, delta: null }),
-    reqEndpoint: () => {
-      const v = Math.round(sameService * 100);
-      return { value: v, display: `${v}%`, anomaly: v > 60, delta: v > 60 ? 'up' : null };
-    },
+    reqEndpoint: concentration,
     errorRate: () => ({ value: profile.errorRate, display: `${profile.errorRate.toFixed(1)}%`, anomaly: profile.errorRate > 10, delta: profile.errorRate > 5 ? 'up' : null }),
     concurrent: () => ({ value: profile.connections, display: profile.connections.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
     bytes: () => ({ value: bytes, display: `${bytes.toLocaleString()} B avg`, anomaly, delta: anomaly ? 'up' : null }),
@@ -553,7 +560,7 @@ export function recordsToFeatures(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS, 14 tests total.
+Expected: PASS, 15 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -866,7 +873,7 @@ and change `attackType,` in the returned object to `attackType: resolvedAttackTy
 - [ ] **Step 5: Verify typecheck and tests pass**
 
 Run: `npm run typecheck && npm test`
-Expected: typecheck silent; 14 tests pass.
+Expected: typecheck silent; 15 tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1057,7 +1064,16 @@ In `src/components/features/TrafficSourceTable.tsx`, change the component signat
 export function TrafficSourceTable({ sources, replay = false }: { sources: TrafficSource[]; replay?: boolean }) {
 ```
 
-and add immediately before the closing `</div>`:
+Because replayed records carry protocols and services rather than ASNs and URL paths, the two affected headers must follow suit. Replace the `<th>` cells for ASN and Endpoint with:
+
+```tsx
+<th className="py-2 pr-3 font-medium">{replay ? 'Protocol' : 'ASN'}</th>
+<th className="py-2 pr-3 font-medium">{replay ? 'Service' : 'Endpoint'}</th>
+```
+
+Leave the `<td>` cells (`s.asn`, `s.endpoint`) unchanged — only the labels change.
+
+Then add immediately before the closing `</div>`:
 
 ```tsx
 {replay && (
@@ -1075,7 +1091,7 @@ In `src/pages/LiveTrafficPage.tsx`, find the `<TrafficSourceTable sources={...} 
 - [ ] **Step 5: Verify typecheck, tests and build**
 
 Run: `npm run typecheck && npm test && npm run build`
-Expected: typecheck silent, 14 tests pass, build succeeds.
+Expected: typecheck silent, 15 tests pass, build succeeds.
 
 - [ ] **Step 6: Commit**
 
