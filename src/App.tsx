@@ -14,6 +14,7 @@ import { SystemHealthPage } from '@/pages/SystemHealthPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { ArchitecturePage } from '@/pages/ArchitecturePage';
 import { UserFlowPage } from '@/pages/UserFlowPage';
+import { DatasetsPage } from '@/pages/DatasetsPage';
 
 function App() {
   const [page, setPage] = useState<PageId>('overview');
@@ -32,6 +33,7 @@ function App() {
       case 'settings': return <SettingsPage />;
       case 'architecture': return <ArchitecturePage />;
       case 'userflow': return <UserFlowPage />;
+      case 'datasets': return <DatasetsPage />;
       default: return <OverviewPage />;
     }
   };

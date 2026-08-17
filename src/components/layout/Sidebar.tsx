@@ -12,6 +12,7 @@ import {
   Settings,
   Network,
   GitBranch,
+  Database,
   ShieldCheck,
   Menu,
   X,
@@ -30,7 +31,8 @@ export type PageId =
   | 'health'
   | 'settings'
   | 'architecture'
-  | 'userflow';
+  | 'userflow'
+  | 'datasets';
 
 interface NavItem {
   id: PageId;
@@ -69,6 +71,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { id: 'architecture', label: 'Technical Architecture', icon: Network },
       { id: 'userflow', label: 'User Flow', icon: GitBranch },
+      { id: 'datasets', label: 'Datasets', icon: Database },
     ],
   },
 ];
