@@ -94,4 +94,44 @@ describe('deriveProfile', () => {
     const p = deriveProfile(mixed, fallback);
     expect(p.normalShare + p.suspShare + p.malShare).toBeCloseTo(1, 5);
   });
+
+  // `rec()` only ever sets errorRate to 0 (benign) or 1 (attack), so it can
+  // never exercise the `label === 'benign' && errorRate > 0.3` branch that
+  // defines suspShare. Build dedicated high-error benign records here so
+  // that branch is genuinely covered.
+  const highErrorBenign = (i: number): ReplayRecord => ({
+    label: 'benign',
+    attackCat: 'Normal',
+    proto: 'tcp',
+    service: 'http',
+    srcBytes: 100 + i,
+    dstBytes: 200 + i,
+    duration: 1,
+    rate: 10,
+    errorRate: 0.5,
+    count: 5,
+    srvCount: 5,
+    uniqueHosts: 20,
+  });
+
+  it('derives suspShare from benign records with high error rates', () => {
+    const records = [
+      ...Array.from({ length: 5 }, (_, i) => rec('benign', i)), // errorRate 0, below threshold
+      ...Array.from({ length: 3 }, (_, i) => highErrorBenign(i)), // errorRate 0.5, above threshold
+      ...Array.from({ length: 2 }, (_, i) => rec('attack', i)),
+    ];
+
+    const p = deriveProfile(records, fallback);
+
+    // 3 of the 10 records are benign with errorRate > 0.3.
+    expect(p.suspShare).toBeGreaterThan(0);
+    expect(p.suspShare).toBeCloseTo(0.3, 5);
+
+    // malShare is fixed by the 2 attack records out of 10 (0.2). normalShare
+    // must absorb suspShare on top of that — it is NOT simply `1 - malShare`
+    // (which would be 0.8).
+    expect(p.malShare).toBeCloseTo(0.2, 5);
+    expect(p.normalShare).toBeCloseTo(0.5, 5);
+    expect(p.normalShare).toBeLessThan(1 - p.malShare);
+  });
 });
