@@ -1,5 +1,6 @@
 import type {
   LogEvent,
+  Profile,
   ServerHealth,
   SimMode,
   SimState,
@@ -112,6 +113,9 @@ export function createInitialState(): SimState {
     challenged: 0,
     lifecyclePhase: 'idle',
     lifecycleStart: 0,
+    datasetId: null,
+    datasetName: null,
+    datasetStatus: 'synthetic',
   };
 }
 
@@ -162,17 +166,7 @@ function mkEvent(severity: LogEvent['severity'], source: string, message: string
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
 // Target profiles per mode
-function profileFor(mode: SimMode): {
-  risk: number;
-  totalRps: number;
-  blockedRps: number;
-  connections: number;
-  errorRate: number;
-  health: number;
-  normalShare: number;
-  suspShare: number;
-  malShare: number;
-} {
+function profileFor(mode: SimMode): Profile {
   switch (mode) {
     case 'normal':
     case 'restored':

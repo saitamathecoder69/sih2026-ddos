@@ -112,4 +112,43 @@ export interface SimState {
   challenged: number;
   lifecyclePhase: 'idle' | 'attack' | 'mitigating' | 'recovering' | 'restored';
   lifecycleStart: number;
+  datasetId: string | null;
+  datasetName: string | null;
+  datasetStatus: 'synthetic' | 'replay';
+}
+
+export interface Profile {
+  risk: number;
+  totalRps: number;
+  blockedRps: number;
+  connections: number;
+  errorRate: number;
+  health: number;
+  normalShare: number;
+  suspShare: number;
+  malShare: number;
+}
+
+export interface ReplayRecord {
+  label: 'benign' | 'attack';
+  attackCat: string;
+  proto: string;
+  service: string;
+  srcBytes: number;
+  dstBytes: number;
+  duration: number;
+  rate: number;
+  errorRate: number;
+  count: number;
+  srvCount: number;
+  uniqueHosts: number;
+}
+
+export interface ReplayBundle {
+  id: string;
+  name: string;
+  sourceFile: string;
+  generatedAt: string;
+  benign: ReplayRecord[];
+  attack: ReplayRecord[];
 }
