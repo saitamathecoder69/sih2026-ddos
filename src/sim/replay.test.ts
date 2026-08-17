@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BLEND, sampleRecords, deriveProfile } from './replay';
-import type { Profile, ReplayBundle, ReplayRecord } from './types';
+import { BLEND, sampleRecords, deriveProfile, recordsToSources, recordsToFeatures } from './replay';
+import type { Profile, ReplayBundle, ReplayRecord, TelemetryFeature } from './types';
 
 const rec = (label: 'benign' | 'attack', i: number): ReplayRecord => ({
   label,
@@ -133,5 +133,47 @@ describe('deriveProfile', () => {
     expect(p.malShare).toBeCloseTo(0.2, 5);
     expect(p.normalShare).toBeCloseTo(0.5, 5);
     expect(p.normalShare).toBeLessThan(1 - p.malShare);
+  });
+});
+
+describe('recordsToSources', () => {
+  it('maps real protocol and service onto the sources table', () => {
+    const out = recordsToSources(Array.from({ length: 6 }, (_, i) => rec('attack', i)));
+    expect(out.length).toBeGreaterThan(0);
+    expect(out[0].endpoint).toBe('http');
+    expect(out[0].asn).toBe('tcp');
+    expect(out[0].status).toBe('BLOCKED');
+  });
+
+  it('marks benign records as legitimate', () => {
+    const out = recordsToSources([rec('benign', 1)]);
+    expect(out[0].status).toBe('LEGITIMATE');
+    expect(out[0].userAgent).toBe('Normal');
+  });
+
+  it('returns an empty array for no records', () => {
+    expect(recordsToSources([])).toEqual([]);
+  });
+});
+
+describe('recordsToFeatures', () => {
+  const prev: TelemetryFeature[] = [
+    { key: 'rps', label: 'Requests/sec', value: 0, display: '0', anomaly: false },
+    { key: 'errorRate', label: 'Error Rate', value: 0, display: '0%', anomaly: false },
+    { key: 'uniqueIps', label: 'Unique IPs', value: 0, display: '0', anomaly: false },
+  ];
+
+  it('fills features from the profile and records', () => {
+    const records = Array.from({ length: 10 }, (_, i) => rec('attack', i));
+    const profile = deriveProfile(records, fallback);
+    const out = recordsToFeatures(prev, records, profile);
+    expect(out.find((f) => f.key === 'rps')!.value).toBe(profile.totalRps);
+    expect(out.find((f) => f.key === 'uniqueIps')!.value).toBeGreaterThan(0);
+  });
+
+  it('preserves keys it has no mapping for', () => {
+    const withUnknown = [...prev, { key: 'zzz', label: 'Unknown', value: 42, display: '42', anomaly: false }];
+    const out = recordsToFeatures(withUnknown, [rec('benign', 0)], fallback);
+    expect(out.find((f) => f.key === 'zzz')!.value).toBe(42);
   });
 });

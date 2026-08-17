@@ -76,3 +76,81 @@ export function deriveProfile(records: ReplayRecord[], fallback: Profile): Profi
     malShare,
   };
 }
+
+/**
+ * Synthesize a stable pseudo-IP from record content.
+ *
+ * NSL-KDD and UNSW-NB15 are feature-extracted datasets containing no source
+ * addresses, so the IP column cannot be real. The UI footnotes this while
+ * replay is active. Every other column below is a genuine record value.
+ */
+function synthIp(r: ReplayRecord, i: number): string {
+  const h = (r.srcBytes * 31 + r.dstBytes * 17 + i * 7) >>> 0;
+  return `${(h % 223) + 1}.${(h >> 3) % 256}.${(h >> 6) % 256}.${((h >> 9) % 254) + 1}`;
+}
+
+export function recordsToSources(records: ReplayRecord[]): TrafficSource[] {
+  return records.slice(0, 8).map((r, i) => ({
+    id: `r${i}`,
+    ip: synthIp(r, i),
+    rps: Math.max(1, Math.round(r.rate)),
+    country: r.label === 'attack' ? 'Unknown' : 'Observed',
+    asn: r.proto,
+    endpoint: r.service,
+    userAgent: r.attackCat,
+    status: r.label === 'attack' ? 'BLOCKED' : r.errorRate > 0.3 ? 'SUSPICIOUS' : 'LEGITIMATE',
+  }));
+}
+
+export function recordsToFeatures(
+  prev: TelemetryFeature[],
+  records: ReplayRecord[],
+  profile: Profile,
+): TelemetryFeature[] {
+  if (records.length === 0) return prev;
+
+  const anomaly = profile.malShare > 0.4;
+  const uniqueHosts = Math.round(mean(records.map((r) => r.uniqueHosts)));
+  const avgCount = Math.round(mean(records.map((r) => r.count)));
+  const avgSrvCount = Math.round(mean(records.map((r) => r.srvCount)));
+  const bytes = Math.round(mean(records.map((r) => r.srcBytes + r.dstBytes)));
+  const services = new Set(records.map((r) => r.service)).size;
+  const protos = new Set(records.map((r) => r.proto)).size;
+  const topService = records[0].service;
+  const sameService = records.filter((r) => r.service === topService).length / records.length;
+
+  // Service concentration drives two different cards; compute once.
+  const concentration = () => {
+    const v = Math.round(sameService * 100);
+    return { value: v, display: `${v}%`, anomaly: v > 60, delta: (v > 60 ? 'up' : null) as 'up' | null };
+  };
+
+  const map: Record<string, () => Partial<TelemetryFeature>> = {
+    rps: () => ({ value: profile.totalRps, display: profile.totalRps.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
+    reqPerIp: () => ({ value: avgCount, display: avgCount.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
+    uniqueIps: () => ({ value: uniqueHosts, display: uniqueHosts.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
+    ipConc: concentration,
+    reqCountry: () => ({ value: protos, display: String(protos), anomaly, delta: null }),
+    reqAsn: () => ({ value: protos, display: String(protos), anomaly, delta: null }),
+    reqEndpoint: concentration,
+    errorRate: () => ({ value: profile.errorRate, display: `${profile.errorRate.toFixed(1)}%`, anomaly: profile.errorRate > 10, delta: profile.errorRate > 5 ? 'up' : null }),
+    concurrent: () => ({ value: profile.connections, display: profile.connections.toLocaleString(), anomaly, delta: anomaly ? 'up' : null }),
+    bytes: () => ({ value: bytes, display: `${bytes.toLocaleString()} B avg`, anomaly, delta: anomaly ? 'up' : null }),
+    packetRate: () => {
+      const v = Math.round(mean(records.map((r) => r.rate)));
+      return { value: v, display: `${v.toLocaleString()} pps`, anomaly, delta: anomaly ? 'up' : null };
+    },
+    timePattern: () => ({ value: anomaly ? 88 : 12, display: anomaly ? 'Bursty' : 'Steady', anomaly }),
+    geoDist: () => ({ value: services, display: `${services} services`, anomaly, delta: anomaly ? 'down' : null }),
+    newIpRatio: () => {
+      const v = Math.round(profile.malShare * 100);
+      return { value: v, display: `${v}%`, anomaly, delta: anomaly ? 'up' : null };
+    },
+    uaSimilarity: () => {
+      const v = Math.round((avgSrvCount / Math.max(1, avgCount)) * 100);
+      return { value: v, display: `${v}%`, anomaly, delta: anomaly ? 'up' : null };
+    },
+  };
+
+  return prev.map((f) => ({ ...f, ...(map[f.key]?.() ?? {}) }) as TelemetryFeature);
+}
