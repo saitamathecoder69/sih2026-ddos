@@ -34,3 +34,45 @@ export function sampleRecords(
 
   return out;
 }
+
+// The dashboard's display range, matched to the existing synthetic profiles
+// so replayed data occupies the same visual scale the gauges were built for.
+const DISPLAY_RPS_BASE = 12480;
+const DISPLAY_RPS_PEAK = 122000;
+const CONNECTIONS_PER_RPS = 0.675;
+
+const mean = (xs: number[]) => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length);
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+/**
+ * Aggregate real records into the profile the engine already consumes.
+ *
+ * Ratios (attack share, error rate, traffic mix) are genuinely derived from
+ * the records. Absolute RPS is scaled onto the dashboard's display range,
+ * because these are per-connection record datasets, not per-second captures.
+ */
+export function deriveProfile(records: ReplayRecord[], fallback: Profile): Profile {
+  if (records.length === 0) return fallback;
+
+  const attacks = records.filter((r) => r.label === 'attack');
+  const attackShare = attacks.length / records.length;
+
+  const suspShare =
+    records.filter((r) => r.label === 'benign' && r.errorRate > 0.3).length / records.length;
+  const malShare = attackShare;
+  const normalShare = Math.max(0, 1 - malShare - suspShare);
+
+  const totalRps = Math.round(DISPLAY_RPS_BASE + (DISPLAY_RPS_PEAK - DISPLAY_RPS_BASE) * attackShare);
+
+  return {
+    risk: clamp(Math.round(attackShare * 100), 2, 99),
+    totalRps,
+    blockedRps: Math.round(totalRps * malShare * 0.95),
+    connections: Math.round(totalRps * CONNECTIONS_PER_RPS),
+    errorRate: clamp(mean(records.map((r) => r.errorRate)) * 100, 0, 100),
+    health: clamp(100 - attackShare * 45, 40, 100),
+    normalShare,
+    suspShare,
+    malShare,
+  };
+}

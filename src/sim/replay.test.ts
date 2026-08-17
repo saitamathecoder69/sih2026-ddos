@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BLEND, sampleRecords } from './replay';
-import type { ReplayBundle, ReplayRecord } from './types';
+import { BLEND, sampleRecords, deriveProfile } from './replay';
+import type { Profile, ReplayBundle, ReplayRecord } from './types';
 
 const rec = (label: 'benign' | 'attack', i: number): ReplayRecord => ({
   label,
@@ -56,5 +56,42 @@ describe('sampleRecords', () => {
   it('returns an empty array for an empty bundle', () => {
     const empty = { ...bundle, benign: [], attack: [] };
     expect(sampleRecords(empty, 'normal', 10, () => 0.5)).toEqual([]);
+  });
+});
+
+const fallback: Profile = {
+  risk: 18, totalRps: 12480, blockedRps: 240, connections: 8421,
+  errorRate: 0.8, health: 99.8, normalShare: 0.96, suspShare: 0.035, malShare: 0.005,
+};
+
+describe('deriveProfile', () => {
+  it('returns the fallback for an empty record set', () => {
+    expect(deriveProfile([], fallback)).toEqual(fallback);
+  });
+
+  it('reports low risk and near-full health for all-benign records', () => {
+    const p = deriveProfile(Array.from({ length: 20 }, (_, i) => rec('benign', i)), fallback);
+    expect(p.risk).toBeLessThan(10);
+    expect(p.health).toBeGreaterThan(95);
+    expect(p.malShare).toBe(0);
+  });
+
+  it('reports high risk and degraded health for all-attack records', () => {
+    const p = deriveProfile(Array.from({ length: 20 }, (_, i) => rec('attack', i)), fallback);
+    expect(p.risk).toBeGreaterThan(90);
+    expect(p.health).toBeLessThan(60);
+    expect(p.malShare).toBe(1);
+  });
+
+  it('scales totalRps upward with attack share', () => {
+    const calm = deriveProfile(Array.from({ length: 10 }, (_, i) => rec('benign', i)), fallback);
+    const storm = deriveProfile(Array.from({ length: 10 }, (_, i) => rec('attack', i)), fallback);
+    expect(storm.totalRps).toBeGreaterThan(calm.totalRps);
+  });
+
+  it('keeps the three traffic shares summing to 1', () => {
+    const mixed = [...Array.from({ length: 5 }, (_, i) => rec('benign', i)), ...Array.from({ length: 5 }, (_, i) => rec('attack', i))];
+    const p = deriveProfile(mixed, fallback);
+    expect(p.normalShare + p.suspShare + p.malShare).toBeCloseTo(1, 5);
   });
 });
