@@ -142,6 +142,13 @@ export interface ReplayRecord {
   count: number;
   srvCount: number;
   uniqueHosts: number;
+  /**
+   * Real source IP, when the record actually has one (e.g. live backend
+   * detections). Feature-extracted datasets like NSL-KDD/UNSW-NB15 have no
+   * such field and leave this undefined, in which case the UI synthesizes
+   * a stable pseudo-IP instead — see synthIp() in replay.ts.
+   */
+  sourceIp?: string;
 }
 
 export interface ReplayBundle {

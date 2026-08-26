@@ -92,7 +92,7 @@ function synthIp(r: ReplayRecord, i: number): string {
 export function recordsToSources(records: ReplayRecord[]): TrafficSource[] {
   return records.slice(0, 8).map((r, i) => ({
     id: `r${i}`,
-    ip: synthIp(r, i),
+    ip: r.sourceIp ?? synthIp(r, i),
     rps: Math.max(1, Math.round(r.rate)),
     country: r.label === 'attack' ? 'Unknown' : 'Observed',
     asn: r.proto,

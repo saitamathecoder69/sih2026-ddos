@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Database, ExternalLink, Lock, GraduationCap, Download, Quote } from 'lucide-react';
+import { Database, ExternalLink, Lock, GraduationCap, Download, Quote, Play } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DATASETS, type DatasetAccessType } from '@/data/datasets';
+import { useSim } from '@/sim/SimContext';
 import { cn } from '@/lib/utils';
 
 const accessStyle: Record<DatasetAccessType, string> = {
@@ -46,6 +47,7 @@ interface SampleData {
 
 export function DatasetsPage() {
   const [sample, setSample] = useState<SampleData | null>(null);
+  const { state, setDataset } = useSim();
 
   useEffect(() => {
     fetch('/data/nsl-kdd-sample.json')
@@ -89,19 +91,36 @@ export function DatasetsPage() {
                           CITATION REQUIRED
                         </span>
                       )}
+                      <span
+                        className={cn(
+                          'chip border',
+                          d.replay.available
+                            ? 'text-ok-400 bg-ok-500/10 border-ok-500/20'
+                            : 'text-slate-400 bg-white/5 border-white/10'
+                        )}
+                      >
+                        {d.replay.available ? 'REPLAY READY' : 'REFERENCE ONLY'}
+                      </span>
                     </div>
                     <p className="mt-1.5 text-sm text-slate-400">{d.description}</p>
                     <p className="mt-1.5 text-[11px] text-slate-500">{d.accessNote}</p>
+                    {d.replay.note && <p className="mt-1 text-[11px] text-slate-600">{d.replay.note}</p>}
                   </div>
-                  <a
-                    href={d.link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-ghost shrink-0 border border-white/10 self-start"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Open
-                  </a>
+                  <div className="flex shrink-0 items-center gap-2 self-start">
+                    {d.replay.available && (
+                      <button
+                        onClick={() => setDataset(state.datasetId === d.id ? null : d.id)}
+                        className={state.datasetId === d.id ? 'btn-ok' : 'btn-ghost border border-white/10'}
+                      >
+                        <Play className="h-3.5 w-3.5" />
+                        {state.datasetId === d.id ? 'Active' : 'Use in simulator'}
+                      </button>
+                    )}
+                    <a href={d.link} target="_blank" rel="noreferrer" className="btn-ghost border border-white/10">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Open
+                    </a>
+                  </div>
                 </div>
               );
             })}

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Activity, Gauge, Play, Pause, RotateCcw, Zap, TrendingUp, Skull } from 'lucide-react';
+import { ShieldCheck, Activity, Gauge, Play, Pause, RotateCcw, Zap, TrendingUp, Skull, Database } from 'lucide-react';
 import { useSim } from '@/sim/SimContext';
 import { cn } from '@/lib/utils';
 import type { SimMode } from '@/sim/types';
+import { DATASETS } from '@/data/datasets';
+import { isSupabaseConfigured } from '@/lib/supabaseClient';
 
 function StatusPill({ label, dotClass, textClass }: { label: string; dotClass: string; textClass: string }) {
   return (
@@ -40,7 +42,7 @@ function SimButton({
 }
 
 export function TopBar() {
-  const { state, setMode, startDemo, pauseDemo, restartDemo, isDemoRunning, demoStepIndex, demoTotalSteps } = useSim();
+  const { state, setMode, setDataset, startDemo, pauseDemo, restartDemo, isDemoRunning, demoStepIndex, demoTotalSteps } = useSim();
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -74,8 +76,20 @@ export function TopBar() {
           <div className="flex items-center gap-2 lg:gap-3">
             <StatusPill label="Protected" dotClass="bg-ok-400" textClass="text-ok-400" />
             <div className="hidden md:flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5">
-              <Activity className="h-3.5 w-3.5 text-info-400" />
-              <span className="text-xs font-medium text-slate-300">Production Simulation</span>
+              <Database className="h-3.5 w-3.5 text-info-400" />
+              <select
+                value={state.datasetId ?? ''}
+                onChange={(e) => setDataset(e.target.value || null)}
+                className="bg-transparent text-xs font-medium text-slate-300 outline-none cursor-pointer"
+              >
+                <option value="" className="bg-ink-850">Built-in simulation</option>
+                {DATASETS.filter((d) => d.replay.available).map((d) => (
+                  <option key={d.id} value={d.id} className="bg-ink-850">{d.name}</option>
+                ))}
+                <option value="live-backend" disabled={!isSupabaseConfigured} className="bg-ink-850">
+                  Live Backend{isSupabaseConfigured ? '' : ' (not configured)'}
+                </option>
+              </select>
             </div>
             <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5">
               <Gauge className="h-3.5 w-3.5 text-brand-300" />

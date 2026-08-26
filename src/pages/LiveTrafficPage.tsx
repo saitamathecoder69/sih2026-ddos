@@ -35,7 +35,11 @@ export function LiveTrafficPage() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <Card title="Traffic Sources" subtitle="Live incoming request origins" icon={<Network className="h-4 w-4" />}>
-            <TrafficSourceTable sources={state.sources} />
+            <TrafficSourceTable
+              sources={state.sources}
+              replay={state.datasetStatus === 'replay'}
+              ipsAreReal={state.datasetId === 'live-backend'}
+            />
           </Card>
           <Card title="Edge & Cloud Protection" subtitle="Request-processing pipeline" icon={<Server className="h-4 w-4" />}>
             <EdgePipeline state={state} />

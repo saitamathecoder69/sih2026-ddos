@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SimMode, SimState, ReplayBundle } from './types';
 import { createInitialState, setMode as applyMode, tick, DEMO_STEPS } from './engine';
+import { subscribeLiveBackend } from './liveBackend';
 import { DATASETS } from '@/data/datasets';
 
 interface SimContextValue {
@@ -45,6 +46,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
   const lifecycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const demoPausedRef = useRef(false);
   const bundleRef = useRef<ReplayBundle | null>(null);
+  const liveUnsubRef = useRef<(() => void) | null>(null);
 
   // Main simulation tick — every 1s
   useEffect(() => {
@@ -53,6 +55,9 @@ export function SimProvider({ children }: { children: ReactNode }) {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Stop any live-backend subscription on unmount.
+  useEffect(() => () => liveUnsubRef.current?.(), []);
 
   const clearLifecycle = () => {
     if (lifecycleTimerRef.current) {
@@ -120,9 +125,26 @@ export function SimProvider({ children }: { children: ReactNode }) {
   };
 
   const setDataset = (id: string | null) => {
+    liveUnsubRef.current?.();
+    liveUnsubRef.current = null;
+
     if (id === null) {
       bundleRef.current = null;
       setState((s) => ({ ...s, datasetId: null, datasetName: null, datasetStatus: 'synthetic' }));
+      return;
+    }
+
+    if (id === 'live-backend') {
+      try {
+        liveUnsubRef.current = subscribeLiveBackend((bundle) => {
+          bundleRef.current = bundle;
+        });
+        setState((s) => ({ ...s, datasetId: id, datasetName: 'Live Backend', datasetStatus: 'replay' }));
+      } catch (err) {
+        console.warn('Live backend unavailable, staying on built-in simulation:', err);
+        bundleRef.current = null;
+        setState((s) => ({ ...s, datasetId: null, datasetName: null, datasetStatus: 'synthetic' }));
+      }
       return;
     }
 
