@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-17
 **Status:** Approved, ready for implementation planning
-**Project:** SentinelMesh (`sih2026-ddos`)
+**Project:** LakshmanRekha (`sih2026-ddos`)
 
 ## Problem
 

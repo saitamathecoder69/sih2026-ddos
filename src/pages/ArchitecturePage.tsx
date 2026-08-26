@@ -8,7 +8,7 @@ export function ArchitecturePage() {
     <div>
       <PageHeader
         title="Technical Architecture"
-        subtitle="End-to-end SentinelMesh architecture — from traffic sources to monitoring"
+        subtitle="End-to-end LakshmanRekha architecture — from traffic sources to monitoring"
         icon={<Network className="h-5 w-5" />}
       />
       <div className="space-y-5">

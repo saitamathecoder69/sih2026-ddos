@@ -91,7 +91,7 @@ export function Sidebar({ current, onNavigate }: SidebarProps) {
           <ShieldCheck className="h-5 w-5 text-brand-300" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-wide text-white">SentinelMesh</div>
+          <div className="text-sm font-semibold tracking-wide text-white">LakshmanRekha</div>
           <div className="text-[10px] uppercase tracking-[0.2em] text-brand-300/80">Detect. Defend. Deliver.</div>
         </div>
       </div>

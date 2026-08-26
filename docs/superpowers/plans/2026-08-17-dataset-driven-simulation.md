@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let a user select a benchmark dataset and have the entire SentinelMesh dashboard run on that dataset's real records instead of `Math.random()` constants.
+**Goal:** Let a user select a benchmark dataset and have the entire LakshmanRekha dashboard run on that dataset's real records instead of `Math.random()` constants.
 
 **Architecture:** Preprocessing flattens each dataset's differing columns into one `ReplayRecord` shape stored as a JSON bundle in `public/data/datasets/`. `SimContext` loads a bundle on selection and passes it to `tick()`. The existing mode buttons choose a benign/attack blend; pure functions in `src/sim/replay.ts` sample real records at that blend and aggregate them into the existing `Profile` object, so all 12 pages inherit real data with no component rewrites.
 
