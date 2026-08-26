@@ -116,8 +116,14 @@ export function recordsToFeatures(
   const bytes = Math.round(mean(records.map((r) => r.srcBytes + r.dstBytes)));
   const services = new Set(records.map((r) => r.service)).size;
   const protos = new Set(records.map((r) => r.proto)).size;
-  const topService = records[0].service;
-  const sameService = records.filter((r) => r.service === topService).length / records.length;
+  // Records are drawn in randomized sampled order, so the actual most
+  // frequent service must be computed from a frequency count — records[0]
+  // is arbitrary and not necessarily the mode.
+  const serviceCounts = new Map<string, number>();
+  for (const r of records) serviceCounts.set(r.service, (serviceCounts.get(r.service) ?? 0) + 1);
+  let topServiceCount = 0;
+  for (const count of serviceCounts.values()) if (count > topServiceCount) topServiceCount = count;
+  const sameService = topServiceCount / records.length;
 
   // Service concentration drives two different cards; compute once.
   const concentration = () => {

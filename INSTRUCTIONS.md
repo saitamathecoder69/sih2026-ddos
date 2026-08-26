@@ -26,8 +26,8 @@ This project already had `@supabase/supabase-js` sitting in `package.json` unuse
    - **Project URL** (`https://xxxxx.supabase.co`)
    - **`anon` `public` key** — safe for the frontend
    - **`service_role` key** — **backend only, never expose this in frontend code or commit it**
-5. Go to **SQL Editor**, paste the contents of `server/db/schema.sql` (already written for you in this repo), and run it. This creates the `traffic_events` and `risk_snapshots` tables the backend writes to.
-6. Go to **Database → Replication** and enable replication on both new tables (this is what makes Supabase Realtime push updates to the dashboard the instant a row is inserted).
+5. Go to **SQL Editor**, paste the contents of `server/db/schema.sql` (already written for you in this repo), and run it. This creates the `traffic_events` table the backend writes to.
+6. Go to **Database → Replication** and enable replication on the `traffic_events` table (this is what makes Supabase Realtime push updates to the dashboard the instant a row is inserted).
 
 → These become `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (backend) and `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (frontend) respectively.
 
@@ -84,7 +84,7 @@ VITE_BACKEND_URL=http://localhost:8787
 ## What you get once all keys are in place
 
 - A real `/ingest` endpoint on the backend that accepts traffic events, runs them through real rate-limiting and rule-based detection, calls Gemini for an anomaly-confidence score on suspicious batches, and writes the result to Supabase.
-- A traffic generator script (`server/scripts/generate-traffic.mjs`) you can run to throw realistic legitimate + attack-shaped load at your own backend, so the dashboard has something real to show.
+- A traffic generator script (`server/scripts/generate-traffic.ts`, run via `npm run generate-traffic` inside `server/`) you can use to throw realistic legitimate + attack-shaped load at your own backend, so the dashboard has something real to show.
 - The dashboard's existing "Datasets" pattern gets a sibling: a **Live Backend** mode, alongside "Built-in Simulation" and the dataset-replay modes, that subscribes to Supabase Realtime and shows genuinely live data instead of anything generated in the browser.
 
 ## What is still not real (honest gaps)

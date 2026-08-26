@@ -50,7 +50,13 @@ export function recordAndEvaluate(sourceIp: string, endpoint: string, userAgent:
 
   const endpointCounts = new Map<string, number>();
   for (const h of globalHits) endpointCounts.set(h.endpoint, (endpointCounts.get(h.endpoint) ?? 0) + 1);
-  const topEndpointShare = Math.max(...endpointCounts.values()) / globalHits.length;
+  // Not Math.max(...endpointCounts.values()) — under real flood volume the
+  // number of distinct endpoint strings seen in the window can be large
+  // enough that spreading into Math.max blows the call stack, crashing the
+  // exact request this backend exists to survive.
+  let topEndpointCount = 0;
+  for (const count of endpointCounts.values()) if (count > topEndpointCount) topEndpointCount = count;
+  const topEndpointShare = topEndpointCount / globalHits.length;
   if (globalHits.length >= 20 && topEndpointShare > ENDPOINT_CONCENTRATION_THRESHOLD) {
     rulesTriggered.push(`Endpoint flooding (${Math.round(topEndpointShare * 100)}% of traffic to one endpoint)`);
     ruleScore += 25;

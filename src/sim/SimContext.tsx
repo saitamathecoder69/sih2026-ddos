@@ -47,6 +47,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
   const demoPausedRef = useRef(false);
   const bundleRef = useRef<ReplayBundle | null>(null);
   const liveUnsubRef = useRef<(() => void) | null>(null);
+  const datasetRequestSeqRef = useRef(0);
 
   // Main simulation tick — every 1s
   useEffect(() => {
@@ -125,6 +126,11 @@ export function SimProvider({ children }: { children: ReactNode }) {
   };
 
   const setDataset = (id: string | null) => {
+    // Every call bumps this so a fetch/subscription from a selection the
+    // user already moved on from can detect it's stale and no-op instead
+    // of overwriting whatever they picked next.
+    const seq = ++datasetRequestSeqRef.current;
+
     liveUnsubRef.current?.();
     liveUnsubRef.current = null;
 
@@ -137,6 +143,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
     if (id === 'live-backend') {
       try {
         liveUnsubRef.current = subscribeLiveBackend((bundle) => {
+          if (datasetRequestSeqRef.current !== seq) return;
           bundleRef.current = bundle;
         });
         setState((s) => ({ ...s, datasetId: id, datasetName: 'Live Backend', datasetStatus: 'replay' }));
@@ -154,11 +161,13 @@ export function SimProvider({ children }: { children: ReactNode }) {
     fetch(meta.replay.bundlePath)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((bundle: ReplayBundle) => {
+        if (datasetRequestSeqRef.current !== seq) return;
         if (!bundle?.benign?.length && !bundle?.attack?.length) throw new Error('empty bundle');
         bundleRef.current = bundle;
         setState((s) => ({ ...s, datasetId: id, datasetName: meta.name, datasetStatus: 'replay' }));
       })
       .catch((err) => {
+        if (datasetRequestSeqRef.current !== seq) return;
         console.warn(`Dataset "${id}" could not be loaded, staying on built-in simulation:`, err);
         bundleRef.current = null;
         setState((s) => ({ ...s, datasetId: null, datasetName: null, datasetStatus: 'synthetic' }));

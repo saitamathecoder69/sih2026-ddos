@@ -119,6 +119,7 @@ export function createInitialState(): SimState {
     datasetId: null,
     datasetName: null,
     datasetStatus: 'synthetic',
+    usingReplayData: false,
   };
 }
 
@@ -349,6 +350,7 @@ export function tick(state: SimState, bundle?: ReplayBundle | null): SimState {
     sources,
     timeToRecover,
     lastUpdated: t,
+    usingReplayData: records.length > 0,
   };
 }
 

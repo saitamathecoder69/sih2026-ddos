@@ -115,6 +115,17 @@ export interface SimState {
   datasetId: string | null;
   datasetName: string | null;
   datasetStatus: 'synthetic' | 'replay';
+  /**
+   * True only when the most recent tick actually rendered features/sources
+   * from real sampled records. datasetStatus flips to 'replay' the instant
+   * a dataset is selected, before any data has necessarily arrived (e.g.
+   * live-backend before its first real event, or a bundle that samples
+   * empty for the current mode) — this field distinguishes "a replay
+   * source is selected" from "the screen is currently showing real data",
+   * so the UI never claims live/real data while actually still showing the
+   * synthetic fallback.
+   */
+  usingReplayData: boolean;
 }
 
 export interface Profile {

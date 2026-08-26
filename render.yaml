@@ -9,8 +9,14 @@ services:
     envVars:
       - key: PORT
         value: 8787
+      # Must stay false on the deployed service: true lets any caller
+      # override the source IP used for rate-limiting/scoring, bypassing
+      # per-IP detection entirely. Flip to true only temporarily, in the
+      # Render dashboard (not here), if you need to run the bundled traffic
+      # generator against this deployed instance for a live demo — and
+      # flip it back afterward.
       - key: ALLOW_SIMULATED_SOURCE_IP
-        value: "true"
+        value: "false"
       - key: ALLOWED_ORIGIN
         sync: false
       - key: GEMINI_API_KEY

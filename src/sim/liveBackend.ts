@@ -14,9 +14,22 @@ interface TrafficEventRow {
 
 const SELECT_COLUMNS = 'source_ip,endpoint,rule_score,rules_triggered,risk_score,classification';
 
+/**
+ * ReplayRecord only has a binary benign/attack label, but the real backend
+ * has three classifications (LEGITIMATE/SUSPICIOUS/MALICIOUS). Only
+ * MALICIOUS maps to 'attack' — SUSPICIOUS stays 'benign' here, and
+ * recordsToSources() in replay.ts recovers the SUSPICIOUS distinction from
+ * errorRate (set below to risk_score/100, so SUSPICIOUS's 31-70 risk band
+ * lands above its > 0.3 threshold). Collapsing SUSPICIOUS into 'attack'
+ * would make recordsToSources render challenged traffic as BLOCKED.
+ */
+function toLabel(classification: TrafficEventRow['classification']): 'benign' | 'attack' {
+  return classification === 'MALICIOUS' ? 'attack' : 'benign';
+}
+
 function rowToRecord(row: TrafficEventRow): ReplayRecord {
   return {
-    label: row.classification === 'LEGITIMATE' ? 'benign' : 'attack',
+    label: toLabel(row.classification),
     attackCat: row.rules_triggered?.[0] ?? row.classification,
     proto: 'http',
     service: row.endpoint,
@@ -33,8 +46,8 @@ function rowToRecord(row: TrafficEventRow): ReplayRecord {
 }
 
 function toBundle(rows: TrafficEventRow[]): ReplayBundle {
-  const benign = rows.filter((r) => r.classification === 'LEGITIMATE').map(rowToRecord);
-  const attack = rows.filter((r) => r.classification !== 'LEGITIMATE').map(rowToRecord);
+  const benign = rows.filter((r) => toLabel(r.classification) === 'benign').map(rowToRecord);
+  const attack = rows.filter((r) => toLabel(r.classification) === 'attack').map(rowToRecord);
   return {
     id: 'live-backend',
     name: 'Live Backend',
