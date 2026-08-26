@@ -105,16 +105,32 @@ if (adapter.hasHeader) {
   start = 1;
 }
 
-const benign = [];
-const attack = [];
+// Pass 1: parse every data line and bucket by label, with no cap, so the
+// full distribution of the source file is available before sampling.
+let benignAll = [];
+let attackAll = [];
 for (let i = start; i < lines.length; i++) {
-  if (benign.length >= PER_LABEL && attack.length >= PER_LABEL) break;
   let r;
   try { r = adapter.map(splitCsv(lines[i]), idx); } catch { continue; }
   if (!r || !r.proto) continue;
-  const bucket = r.label === 'attack' ? attack : benign;
-  if (bucket.length < PER_LABEL) bucket.push(r);
+  (r.label === 'attack' ? attackAll : benignAll).push(r);
 }
+
+// Pass 2: downsample each bucket to exactly PER_LABEL by taking
+// evenly-spaced indices across the full bucket, so the sample reflects
+// the whole file rather than just its head. Buckets at or under the cap
+// are kept in full. Deterministic — no randomness.
+function downsample(bucket) {
+  if (bucket.length <= PER_LABEL) return bucket;
+  const out = [];
+  for (let i = 0; i < PER_LABEL; i++) {
+    out.push(bucket[Math.floor((i * bucket.length) / PER_LABEL)]);
+  }
+  return out;
+}
+
+const benign = downsample(benignAll);
+const attack = downsample(attackAll);
 
 const outDir = path.join('public', 'data', 'datasets');
 fs.mkdirSync(outDir, { recursive: true });
