@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { SimMode, SimState } from './types';
+import type { SimMode, SimState, ReplayBundle } from './types';
 import { createInitialState, setMode as applyMode, tick, DEMO_STEPS } from './engine';
+import { DATASETS } from '@/data/datasets';
 
 interface SimContextValue {
   state: SimState;
@@ -8,6 +9,7 @@ interface SimContextValue {
   startDemo: () => void;
   pauseDemo: () => void;
   restartDemo: () => void;
+  setDataset: (id: string | null) => void;
   isDemoRunning: boolean;
   demoStepIndex: number;
   demoTotalSteps: number;
@@ -42,11 +44,12 @@ export function SimProvider({ children }: { children: ReactNode }) {
   const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lifecycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const demoPausedRef = useRef(false);
+  const bundleRef = useRef<ReplayBundle | null>(null);
 
   // Main simulation tick — every 1s
   useEffect(() => {
     const interval = setInterval(() => {
-      setState((s) => tick(s));
+      setState((s) => tick(s, bundleRef.current));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -64,7 +67,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
     const next = lifecycleNextFor(mode);
     if (duration !== null && next !== null) {
       lifecycleTimerRef.current = setTimeout(() => {
-        setState((s) => applyMode(s, next));
+        setState((s) => applyMode(s, next, bundleRef.current));
         advanceLifecycle(next);
       }, duration);
     }
@@ -72,7 +75,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
 
   const setMode = (mode: SimMode) => {
     clearLifecycle();
-    setState((s) => applyMode(s, mode));
+    setState((s) => applyMode(s, mode, bundleRef.current));
     // Start auto-progression for attack/spike scenarios
     if (mode === 'spike' || mode === 'httpflood' || mode === 'ddos') {
       advanceLifecycle(mode);
@@ -83,14 +86,14 @@ export function SimProvider({ children }: { children: ReactNode }) {
     if (index >= DEMO_STEPS.length) {
       setDemoRunning(false);
       setDemoStepIndex(-1);
-      setState((s) => applyMode(s, 'restored'));
-      setTimeout(() => setState((s) => applyMode(s, 'normal')), 2500);
+      setState((s) => applyMode(s, 'restored', bundleRef.current));
+      setTimeout(() => setState((s) => applyMode(s, 'normal', bundleRef.current)), 2500);
       return;
     }
     if (demoPausedRef.current) return;
     const step = DEMO_STEPS[index];
     setDemoStepIndex(index);
-    setState((s) => applyMode(s, step.mode));
+    setState((s) => applyMode(s, step.mode, bundleRef.current));
     demoTimerRef.current = setTimeout(() => runDemoStep(index + 1), step.duration);
   };
 
@@ -112,8 +115,32 @@ export function SimProvider({ children }: { children: ReactNode }) {
     clearLifecycle();
     demoPausedRef.current = false;
     setDemoRunning(true);
-    setState((s) => applyMode(s, 'normal'));
+    setState((s) => applyMode(s, 'normal', bundleRef.current));
     setTimeout(() => runDemoStep(0), 300);
+  };
+
+  const setDataset = (id: string | null) => {
+    if (id === null) {
+      bundleRef.current = null;
+      setState((s) => ({ ...s, datasetId: null, datasetName: null, datasetStatus: 'synthetic' }));
+      return;
+    }
+
+    const meta = DATASETS.find((d) => d.id === id);
+    if (!meta?.replay.available || !meta.replay.bundlePath) return;
+
+    fetch(meta.replay.bundlePath)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((bundle: ReplayBundle) => {
+        if (!bundle?.benign?.length && !bundle?.attack?.length) throw new Error('empty bundle');
+        bundleRef.current = bundle;
+        setState((s) => ({ ...s, datasetId: id, datasetName: meta.name, datasetStatus: 'replay' }));
+      })
+      .catch((err) => {
+        console.warn(`Dataset "${id}" could not be loaded, staying on built-in simulation:`, err);
+        bundleRef.current = null;
+        setState((s) => ({ ...s, datasetId: null, datasetName: null, datasetStatus: 'synthetic' }));
+      });
   };
 
   const currentStep = demoStepIndex >= 0 ? DEMO_STEPS[demoStepIndex] : null;
@@ -125,6 +152,7 @@ export function SimProvider({ children }: { children: ReactNode }) {
     startDemo,
     pauseDemo,
     restartDemo,
+    setDataset,
     isDemoRunning: demoRunning,
     demoStepIndex,
     demoTotalSteps: DEMO_STEPS.length,

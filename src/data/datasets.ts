@@ -1,5 +1,11 @@
 export type DatasetAccessType = 'free' | 'academic' | 'restricted';
 
+export interface DatasetReplay {
+  available: boolean;
+  bundlePath?: string;
+  note?: string;
+}
+
 export interface DatasetInfo {
   id: string;
   name: string;
@@ -8,6 +14,7 @@ export interface DatasetInfo {
   accessType: DatasetAccessType;
   accessNote: string;
   citationRequired?: boolean;
+  replay: DatasetReplay;
 }
 
 export const DATASETS: DatasetInfo[] = [
@@ -19,6 +26,7 @@ export const DATASETS: DatasetInfo[] = [
     accessType: 'free',
     accessNote: 'Free, direct download, cite the dataset + paper',
     citationRequired: true,
+    replay: { available: false, note: 'Run scripts/prepare-dataset.mjs on the downloaded CSV to enable replay.' },
   },
   {
     id: 'cic-ids2017',
@@ -27,6 +35,7 @@ export const DATASETS: DatasetInfo[] = [
     link: 'https://www.unb.ca/cic/datasets/ids-2017.html',
     accessType: 'free',
     accessNote: 'Free, direct download',
+    replay: { available: false, note: 'Run scripts/prepare-dataset.mjs on the downloaded CSV to enable replay.' },
   },
   {
     id: 'cse-cic-ids2018',
@@ -35,6 +44,7 @@ export const DATASETS: DatasetInfo[] = [
     link: 'https://www.unb.ca/cic/datasets/ids-2018.html',
     accessType: 'free',
     accessNote: 'Free, direct download',
+    replay: { available: false, note: 'Run scripts/prepare-dataset.mjs on the downloaded CSV to enable replay.' },
   },
   {
     id: 'caida-ddos-2007',
@@ -43,6 +53,7 @@ export const DATASETS: DatasetInfo[] = [
     link: 'https://www.caida.org/catalog/datasets/ddos-20070804_dataset/',
     accessType: 'restricted',
     accessNote: 'Restricted, request form required, 2-3 business day approval, academic/government/CAIDA-member only',
+    replay: { available: false, note: 'Restricted licence — cannot be bundled.' },
   },
   {
     id: 'nsl-kdd',
@@ -51,6 +62,7 @@ export const DATASETS: DatasetInfo[] = [
     link: 'https://www.unb.ca/cic/datasets/nsl.html',
     accessType: 'free',
     accessNote: 'Free, direct download',
+    replay: { available: true, bundlePath: '/data/datasets/nsl-kdd.json' },
   },
   {
     id: 'unsw-nb15',
@@ -59,5 +71,6 @@ export const DATASETS: DatasetInfo[] = [
     link: 'https://research.unsw.edu.au/projects/unsw-nb15-dataset',
     accessType: 'academic',
     accessNote: 'Free for academic research, commercial use prohibited',
+    replay: { available: true, bundlePath: '/data/datasets/unsw-nb15.json' },
   },
 ];
