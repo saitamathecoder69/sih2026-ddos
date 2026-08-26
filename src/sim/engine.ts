@@ -1,6 +1,8 @@
 import type {
   LogEvent,
   Profile,
+  ReplayBundle,
+  ReplayRecord,
   ServerHealth,
   SimMode,
   SimState,
@@ -8,6 +10,7 @@ import type {
   TrafficPoint,
   TrafficSource,
 } from './types';
+import { deriveProfile, recordsToFeatures, recordsToSources, sampleRecords } from './replay';
 
 let eventCounter = 0;
 const now = () => Date.now();
@@ -186,8 +189,23 @@ function profileFor(mode: SimMode): Profile {
   }
 }
 
-export function setMode(state: SimState, mode: SimMode): SimState {
-  const profile = profileFor(mode);
+const SAMPLE_SIZE = 40;
+
+/**
+ * Resolve the profile for this tick. With a bundle loaded the numbers come
+ * from real sampled records; without one the original synthetic profile runs
+ * unchanged.
+ */
+function resolveProfile(mode: SimMode, bundle?: ReplayBundle | null): { profile: Profile; records: ReplayRecord[] } {
+  const synthetic = profileFor(mode);
+  if (!bundle) return { profile: synthetic, records: [] };
+  const records = sampleRecords(bundle, mode, SAMPLE_SIZE);
+  if (records.length === 0) return { profile: synthetic, records: [] };
+  return { profile: deriveProfile(records, synthetic), records };
+}
+
+export function setMode(state: SimState, mode: SimMode, bundle?: ReplayBundle | null): SimState {
+  const { profile, records } = resolveProfile(mode, bundle);
   let threatLevel: SimState['threatLevel'] = 'NORMAL';
   let systemState: SimState['systemState'] = 'NORMAL';
   if (profile.risk > 70) { threatLevel = 'MALICIOUS'; systemState = 'MALICIOUS'; }
@@ -243,6 +261,9 @@ export function setMode(state: SimState, mode: SimMode): SimState {
     confidence: attackActive ? [88, 92, 84, 76][i] : mode === 'spike' ? [42, 38, 30, 22][i] : mode === 'recovering' ? [38, 32, 26, 18][i] : [12, 8, 6, 4][i],
   }));
 
+  const replayAttackType = records.find((r) => r.label === 'attack')?.attackCat;
+  const resolvedAttackType = replayAttackType && attackActive ? replayAttackType : attackType;
+
   return {
     ...state,
     mode,
@@ -254,7 +275,7 @@ export function setMode(state: SimState, mode: SimMode): SimState {
     activeConnections: profile.connections,
     errorRate: profile.errorRate,
     appHealth: profile.health,
-    attackType,
+    attackType: resolvedAttackType,
     attackTarget,
     attackSeverity,
     attackActive,
@@ -273,8 +294,8 @@ export function setMode(state: SimState, mode: SimMode): SimState {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-export function tick(state: SimState): SimState {
-  const profile = profileFor(state.mode);
+export function tick(state: SimState, bundle?: ReplayBundle | null): SimState {
+  const { profile, records } = resolveProfile(state.mode, bundle);
   const t = now();
 
   // Smoothly interpolate risk score toward target
@@ -296,13 +317,17 @@ export function tick(state: SimState): SimState {
   const history = [...state.trafficHistory.slice(-119), newPoint];
 
   // Features
-  const features = updateFeatures(state.features, state.mode, totalRps, connections, errorRate, risk);
+  const features = records.length
+    ? recordsToFeatures(state.features, records, profile)
+    : updateFeatures(state.features, state.mode, totalRps, connections, errorRate, risk);
 
   // Servers
   const servers = updateServers(state.servers, state.mode, totalRps, health, state.recoveryActive);
 
   // Sources
-  const sources = updateSources(state.sources, state.mode, totalRps);
+  const sources = records.length
+    ? recordsToSources(records)
+    : updateSources(state.sources, state.mode, totalRps);
 
   // Time-to-recover countdown
   let timeToRecover = state.timeToRecover;
